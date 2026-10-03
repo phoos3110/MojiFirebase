@@ -5,6 +5,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, create, update, delete: if request.auth != null
         && request.auth.uid == userId;
+        
+      match /notifications/{notifId} {
+        allow read, create, update, delete: if request.auth != null 
+          && request.auth.uid == userId;
+      }
     }
 
     match /usernames/{username} {

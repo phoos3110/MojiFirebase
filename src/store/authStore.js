@@ -6,6 +6,9 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from 'firebase/auth'
 import {
   doc,
@@ -193,6 +196,18 @@ const useAuthStore = create((set, get) => ({
     set(state => ({
       user: { ...state.user, avatarUrl: downloadURL }
     }))
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const { auth } = requireFirebase()
+    if (!auth.currentUser) throw new Error('Bạn chưa đăng nhập')
+    
+    // 1. Re-authenticate
+    const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword)
+    await reauthenticateWithCredential(auth.currentUser, credential)
+    
+    // 2. Update password
+    await updatePassword(auth.currentUser, newPassword)
   },
 
   initialize: () => {

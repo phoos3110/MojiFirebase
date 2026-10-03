@@ -131,7 +131,7 @@ export default function AppLayout({ children }) {
   )
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
+    <div style={{ display: 'flex', minHeight: '100dvh', position: 'relative' }}>
       {/* Background */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
@@ -147,7 +147,7 @@ export default function AppLayout({ children }) {
         borderRight: '1px solid rgba(255,255,255,0.06)',
         background: 'rgba(10,5,32,0.8)',
         backdropFilter: 'blur(20px)',
-        position: 'fixed', top: 0, left: 0, height: '100vh',
+        position: 'fixed', top: 0, left: 0, height: '100dvh',
         zIndex: 100,
         display: 'none',
       }} className="desktop-sidebar">
@@ -167,7 +167,7 @@ export default function AppLayout({ children }) {
 
       {/* Mobile sidebar panel */}
       <aside style={{
-        width: 260, position: 'fixed', top: 0, left: 0, height: '100vh',
+        width: 260, position: 'fixed', top: 0, left: 0, height: '100dvh',
         background: 'rgba(10,5,32,0.95)',
         backdropFilter: 'blur(20px)',
         borderRight: '1px solid rgba(255,255,255,0.08)',

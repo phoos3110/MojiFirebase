@@ -312,12 +312,13 @@ export default function AuthPage() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
         padding: '24px 16px',
+        overflow: 'hidden',
       }}
     >
       <SakuraBackground />

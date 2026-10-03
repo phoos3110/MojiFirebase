@@ -12,7 +12,9 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { firebaseConfigured, requireFirebase } from '../lib/firebase'
 
 function toUser(firebaseUser, profile = {}) {
@@ -146,6 +148,51 @@ const useAuthStore = create((set, get) => ({
     const { auth } = requireFirebase()
     await firebaseSignOut(auth)
     set({ user: null, isAuthenticated: false, profileError: null })
+  },
+  
+  updateProfileData: async (data) => {
+    const { auth, db } = requireFirebase()
+    if (!auth.currentUser) throw new Error('Bạn chưa đăng nhập')
+
+    const userRef = doc(db, 'users', auth.currentUser.uid)
+    const displayName = `${data.firstName} ${data.lastName}`.trim()
+    
+    // Update Auth Profile if displayName changes
+    if (displayName !== get().user?.displayName) {
+      await updateProfile(auth.currentUser, { displayName })
+    }
+
+    const updates = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      displayName,
+      phone: data.phone || '',
+      bio: data.bio || '',
+    }
+
+    await updateDoc(userRef, updates)
+    
+    set(state => ({
+      user: { ...state.user, ...updates }
+    }))
+  },
+
+  updateAvatar: async (file) => {
+    const { auth, db, storage } = requireFirebase()
+    if (!auth.currentUser) throw new Error('Bạn chưa đăng nhập')
+
+    const storageRef = ref(storage, `avatars/${auth.currentUser.uid}_${Date.now()}`)
+    await uploadBytes(storageRef, file)
+    const downloadURL = await getDownloadURL(storageRef)
+
+    await updateProfile(auth.currentUser, { photoURL: downloadURL })
+
+    const userRef = doc(db, 'users', auth.currentUser.uid)
+    await updateDoc(userRef, { avatarUrl: downloadURL })
+
+    set(state => ({
+      user: { ...state.user, avatarUrl: downloadURL }
+    }))
   },
 
   initialize: () => {

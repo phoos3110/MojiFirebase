@@ -150,6 +150,23 @@ body {
   box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
 }
 
+/* Fix huge password dots on iOS Safari */
+.anime-input[type="password"] {
+  font-family: system-ui, -apple-system, sans-serif;
+  letter-spacing: 2px;
+}
+
+/* Fix ugly yellow background on WebKit autofill */
+.anime-input:-webkit-autofill,
+.anime-input:-webkit-autofill:hover, 
+.anime-input:-webkit-autofill:focus, 
+.anime-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #110a30 inset !important;
+  -webkit-text-fill-color: #f1f0ff !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: #f1f0ff;
+}
+
 .btn-primary {
   background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
   border: none;

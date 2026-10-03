@@ -108,6 +108,25 @@ const useAuthStore = create((set, get) => ({
             createdAt: serverTimestamp(),
           })
         })
+
+        // Gửi email chào mừng bằng EmailJS
+        try {
+          const emailjs = await import('@emailjs/browser')
+          await emailjs.send(
+            'service_2esnnyk', // Service ID
+            'template_n6yh8d7', // Template ID
+            {
+              to_email: email,
+              to_name: displayName,
+              message: 'Cảm ơn bạn đã đăng ký tài khoản. Bắt đầu khám phá hàng ngàn bộ phim siêu đỉnh và tham gia cộng đồng Anime lớn nhất nhé!'
+            },
+            'jXMwJHbcwW7N_Sfk1' // Public Key
+          )
+          console.log('Đã gửi email chào mừng qua EmailJS')
+        } catch (emailError) {
+          console.error('Lỗi khi gửi email chào mừng:', emailError)
+        }
+
       } catch (error) {
         try {
           await deleteUser(credential.user)

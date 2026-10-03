@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@hookform/resolvers": "^5.9.1",
     "@tailwindcss/vite": "^4.3.3",
     "firebase": "^11.10.0",

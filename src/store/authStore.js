@@ -17,6 +17,7 @@ import {
   serverTimestamp,
   updateDoc,
   deleteDoc,
+  collection,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { firebaseConfigured, requireFirebase } from '../lib/firebase'
@@ -86,6 +87,10 @@ const useAuthStore = create((set, get) => ({
 
       try {
         await updateProfile(credential.user, { displayName })
+        
+        // Add welcome notification
+        const notifRef = doc(collection(db, 'users', credential.user.uid, 'notifications'))
+        
         await runTransaction(db, async (transaction) => {
           const usernameSnapshot = await transaction.get(usernameRef)
           if (usernameSnapshot.exists()) {
@@ -96,6 +101,12 @@ const useAuthStore = create((set, get) => ({
 
           transaction.set(usernameRef, { uid: credential.user.uid })
           transaction.set(userRef, profile)
+          transaction.set(notifRef, {
+            title: 'Chào mừng bạn đến với Moji! 🎉',
+            desc: 'Cảm ơn bạn đã gia nhập cộng đồng. Hãy khám phá hàng ngàn bộ anime siêu đỉnh ngay thôi nào!',
+            read: false,
+            createdAt: serverTimestamp(),
+          })
         })
       } catch (error) {
         try {

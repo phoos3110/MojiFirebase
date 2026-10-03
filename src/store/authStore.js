@@ -16,8 +16,9 @@ import {
   runTransaction,
   serverTimestamp,
   updateDoc,
+  deleteDoc,
 } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { firebaseConfigured, requireFirebase } from '../lib/firebase'
 
 function toUser(firebaseUser, profile = {}) {
@@ -33,9 +34,11 @@ function toUser(firebaseUser, profile = {}) {
     phone: profile.phone || '',
     bio: profile.bio || '',
     avatarUrl: profile.avatarUrl || firebaseUser.photoURL || '',
+    settings: profile.settings || { pushNotif: true, emailNotif: false },
     createdAt: profile.createdAt?.toDate?.().toISOString()
       || firebaseUser.metadata.creationTime
       || null,
+    lastSignInTime: firebaseUser.metadata.lastSignInTime || null,
   }
 }
 
@@ -77,6 +80,7 @@ const useAuthStore = create((set, get) => ({
         phone: '',
         bio: '',
         avatarUrl: '',
+        settings: { pushNotif: true, emailNotif: false },
         createdAt: serverTimestamp(),
       }
 
@@ -198,16 +202,56 @@ const useAuthStore = create((set, get) => ({
     }))
   },
 
+  updateSettings: async (newSettings) => {
+    const { auth, db } = requireFirebase()
+    if (!auth.currentUser) return
+
+    const userRef = doc(db, 'users', auth.currentUser.uid)
+    await updateDoc(userRef, { settings: newSettings })
+    
+    set(state => ({
+      user: { ...state.user, settings: { ...state.user.settings, ...newSettings } }
+    }))
+  },
+
   changePassword: async (currentPassword, newPassword) => {
     const { auth } = requireFirebase()
     if (!auth.currentUser) throw new Error('Bạn chưa đăng nhập')
     
-    // 1. Re-authenticate
     const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword)
     await reauthenticateWithCredential(auth.currentUser, credential)
-    
-    // 2. Update password
     await updatePassword(auth.currentUser, newPassword)
+  },
+
+  deleteUserAccount: async (password) => {
+    const { auth, db, storage } = requireFirebase()
+    if (!auth.currentUser) throw new Error('Bạn chưa đăng nhập')
+
+    // 1. Re-authenticate
+    const credential = EmailAuthProvider.credential(auth.currentUser.email, password)
+    await reauthenticateWithCredential(auth.currentUser, credential)
+
+    const uid = auth.currentUser.uid
+    const currentUserState = get().user
+
+    // 2. Clean up Firestore Data (Best effort)
+    try {
+      if (currentUserState?.username) {
+        await deleteDoc(doc(db, 'usernames', currentUserState.username.toLowerCase()))
+      }
+      await deleteDoc(doc(db, 'users', uid))
+      
+      if (currentUserState?.avatarUrl?.includes('firebasestorage')) {
+        const fileRef = ref(storage, currentUserState.avatarUrl)
+        await deleteObject(fileRef).catch(() => {})
+      }
+    } catch (e) {
+      console.warn('Cleanup non-critical data failed', e)
+    }
+
+    // 3. Delete Auth User
+    await deleteUser(auth.currentUser)
+    set({ user: null, isAuthenticated: false })
   },
 
   initialize: () => {

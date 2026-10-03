@@ -6,11 +6,15 @@ import { toast } from 'sonner'
 import AppLayout from '../layouts/AppLayout'
 import useAuthStore from '../store/authStore'
 import { getFirebaseErrorMessage } from '../lib/firebaseErrors'
-import { Bell, Shield, Moon, Globe, Trash2, ChevronRight, X, Loader2, AlertCircle } from 'lucide-react'
+import { Bell, Shield, Moon, Globe, Trash2, ChevronRight, X, Loader2, AlertCircle, Info } from 'lucide-react'
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu cũ'),
   newPassword: z.string().min(6, 'Mật khẩu mới phải có ít nhất 6 ký tự'),
+})
+
+const deleteSchema = z.object({
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu để xác nhận'),
 })
 
 function InputField({ label, error, ...props }) {
@@ -23,7 +27,7 @@ function InputField({ label, error, ...props }) {
   )
 }
 
-function SettingRow({ icon: Icon, label, desc, action, onClick, color = '#a78bfa' }) {
+function SettingRow({ icon: Icon, label, desc, action, onClick, color = '#a78bfa', danger = false }) {
   return (
     <div 
       onClick={onClick}
@@ -33,8 +37,9 @@ function SettingRow({ icon: Icon, label, desc, action, onClick, color = '#a78bfa
         margin: '4px -16px',
         borderRadius: 12,
         cursor: onClick || action ? 'pointer' : 'default',
+        color: danger ? '#f87171' : 'inherit',
       }}
-      className={onClick || action ? "glass-card-hover" : ""}
+      className={onClick || action ? (danger ? "glass-card-hover-danger" : "glass-card-hover") : ""}
     >
       <div style={{
         width: 40, height: 40, borderRadius: 11,
@@ -44,10 +49,10 @@ function SettingRow({ icon: Icon, label, desc, action, onClick, color = '#a78bfa
         <Icon size={18} style={{ color }} />
       </div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, color: '#f1f0ff', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-        {desc && <div style={{ fontSize: 12, color: 'rgba(241,240,255,0.4)' }}>{desc}</div>}
+        <div style={{ fontSize: 14, color: danger ? '#f87171' : '#f1f0ff', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+        {desc && <div style={{ fontSize: 12, color: danger ? 'rgba(248,113,113,0.6)' : 'rgba(241,240,255,0.4)' }}>{desc}</div>}
       </div>
-      {action || <ChevronRight size={16} style={{ color: 'rgba(241,240,255,0.2)' }} />}
+      {action || <ChevronRight size={16} style={{ color: danger ? 'rgba(248,113,113,0.4)' : 'rgba(241,240,255,0.2)' }} />}
     </div>
   )
 }
@@ -81,37 +86,40 @@ function Toggle({ checked, onChange }) {
 }
 
 export default function SettingsPage() {
-  const { changePassword } = useAuthStore()
+  const { user, changePassword, updateSettings, deleteUserAccount } = useAuthStore()
   
-  // Toggle states
-  const [pushNotif, setPushNotif] = useState(true)
-  const [emailNotif, setEmailNotif] = useState(false)
+  // Modals
   const [isPasswordModalOpen, setPasswordModalOpen] = useState(false)
-
-  // Load from local storage
-  useEffect(() => {
-    const savedPush = localStorage.getItem('moji_push_notif')
-    const savedEmail = localStorage.getItem('moji_email_notif')
-    if (savedPush !== null) setPushNotif(savedPush === 'true')
-    if (savedEmail !== null) setEmailNotif(savedEmail === 'true')
-  }, [])
+  const [isSessionModalOpen, setSessionModalOpen] = useState(false)
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false)
 
   // Handlers for toggles
-  const handlePushToggle = (val) => {
-    setPushNotif(val)
-    localStorage.setItem('moji_push_notif', val)
-    if (val) toast.success('Đã bật thông báo đẩy')
+  const handlePushToggle = async (val) => {
+    try {
+      await updateSettings({ pushNotif: val })
+      toast.success(val ? 'Đã bật thông báo đẩy' : 'Đã tắt thông báo đẩy')
+    } catch (e) {
+      toast.error('Lỗi khi lưu cài đặt')
+    }
   }
 
-  const handleEmailToggle = (val) => {
-    setEmailNotif(val)
-    localStorage.setItem('moji_email_notif', val)
-    if (val) toast.success('Đã bật email thông báo')
+  const handleEmailToggle = async (val) => {
+    try {
+      await updateSettings({ emailNotif: val })
+      toast.success(val ? 'Đã bật email thông báo' : 'Đã tắt email thông báo')
+    } catch (e) {
+      toast.error('Lỗi khi lưu cài đặt')
+    }
   }
 
   // Password Form
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
+  const { register: registerPass, handleSubmit: handlePassSubmit, reset: resetPass, formState: { errors: passErrors, isSubmitting: isPassSubmitting } } = useForm({
     resolver: zodResolver(passwordSchema)
+  })
+
+  // Delete Form
+  const { register: registerDelete, handleSubmit: handleDeleteSubmit, reset: resetDelete, formState: { errors: deleteErrors, isSubmitting: isDeleteSubmitting } } = useForm({
+    resolver: zodResolver(deleteSchema)
   })
 
   const onSubmitPassword = async (data) => {
@@ -119,7 +127,7 @@ export default function SettingsPage() {
       await changePassword(data.currentPassword, data.newPassword)
       toast.success('Đổi mật khẩu thành công! 🔐')
       setPasswordModalOpen(false)
-      reset()
+      resetPass()
     } catch (error) {
       if (error.code === 'auth/invalid-credential') {
         toast.error('Mật khẩu cũ không chính xác.')
@@ -129,10 +137,21 @@ export default function SettingsPage() {
     }
   }
 
-  const openPasswordModal = () => {
-    reset()
-    setPasswordModalOpen(true)
+  const onSubmitDelete = async (data) => {
+    try {
+      await deleteUserAccount(data.password)
+      toast.success('Đã xóa tài khoản vĩnh viễn.')
+    } catch (error) {
+      if (error.code === 'auth/invalid-credential') {
+        toast.error('Mật khẩu không chính xác.')
+      } else {
+        toast.error(getFirebaseErrorMessage(error, 'Xóa tài khoản thất bại'))
+      }
+    }
   }
+
+  const openPasswordModal = () => { resetPass(); setPasswordModalOpen(true) }
+  const openDeleteModal = () => { resetDelete(); setDeleteModalOpen(true) }
 
   return (
     <AppLayout>
@@ -150,19 +169,19 @@ export default function SettingsPage() {
         {/* Notifications */}
         <div className="glass-card animate-fade-in-up" style={{ padding: '24px', opacity: 0, animationDelay: '100ms' }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: 'rgba(241,240,255,0.4)', letterSpacing: '1.5px', marginBottom: 4 }}>
-            THÔNG BÁO
+            THÔNG BÁO (ĐỒNG BỘ CLOUD)
           </h3>
           <SettingRow
             icon={Bell} label="Thông báo đẩy"
             desc="Nhận thông báo khi có anime mới"
             color="#f472b6"
-            action={<Toggle checked={pushNotif} onChange={handlePushToggle} />}
+            action={<Toggle checked={user?.settings?.pushNotif ?? true} onChange={handlePushToggle} />}
           />
           <SettingRow
             icon={Bell} label="Email thông báo"
             desc="Nhận email tổng hợp hàng tuần"
             color="#f472b6"
-            action={<Toggle checked={emailNotif} onChange={handleEmailToggle} />}
+            action={<Toggle checked={user?.settings?.emailNotif ?? false} onChange={handleEmailToggle} />}
           />
         </div>
 
@@ -196,10 +215,10 @@ export default function SettingsPage() {
             color="#34d399"
           />
           <SettingRow
-            icon={Shield} label="Phiên đăng nhập"
-            desc="Quản lý các thiết bị đang đăng nhập"
+            onClick={() => setSessionModalOpen(true)}
+            icon={Info} label="Thông tin phiên đăng nhập"
+            desc="Xem chi tiết phiên hoạt động hiện tại"
             color="#34d399"
-            onClick={() => toast('Tính năng này sẽ sớm ra mắt! 🚀')}
           />
         </div>
 
@@ -213,10 +232,11 @@ export default function SettingsPage() {
             VÙNG NGUY HIỂM
           </h3>
           <SettingRow
+            onClick={openDeleteModal}
             icon={Trash2} label="Xóa tài khoản"
-            desc="Hành động này không thể hoàn tác"
+            desc="Hành động này không thể hoàn tác, mọi dữ liệu sẽ bị xóa sạch."
             color="#f472b6"
-            onClick={() => toast('Vui lòng liên hệ Admin để xóa tài khoản.')}
+            danger={true}
           />
         </div>
 
@@ -242,28 +262,121 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmitPassword)} style={{ display: 'flex', flexDirection: 'column' }}>
+            <form onSubmit={handlePassSubmit(onSubmitPassword)} style={{ display: 'flex', flexDirection: 'column' }}>
               <InputField 
                 label="Mật khẩu hiện tại" 
                 type="password" 
                 placeholder="••••••••" 
-                error={errors.currentPassword?.message} 
-                {...register('currentPassword')} 
+                error={passErrors.currentPassword?.message} 
+                {...registerPass('currentPassword')} 
               />
               <InputField 
                 label="Mật khẩu mới" 
                 type="password" 
                 placeholder="••••••••" 
-                error={errors.newPassword?.message} 
-                {...register('newPassword')} 
+                error={passErrors.newPassword?.message} 
+                {...registerPass('newPassword')} 
               />
               
               <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                 <button type="button" onClick={() => setPasswordModalOpen(false)} className="btn-secondary" style={{ flex: 1, padding: '10px' }}>
                   Hủy
                 </button>
-                <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ flex: 1, padding: '10px' }}>
-                  {isSubmitting ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} /> : 'Cập nhật'}
+                <button type="submit" disabled={isPassSubmitting} className="btn-primary" style={{ flex: 1, padding: '10px' }}>
+                  {isPassSubmitting ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} /> : 'Cập nhật'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Session Info Modal */}
+      {isSessionModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16
+        }}>
+          <div className="glass-card animate-fade-in-up" style={{
+            width: '100%', maxWidth: 400, padding: 32,
+            background: 'rgba(10,5,32,0.95)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 40px rgba(52,211,153,0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Thông tin phiên</h2>
+              <button onClick={() => setSessionModalOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, color: 'rgba(241,240,255,0.8)' }}>
+              <div>
+                <div style={{ fontSize: 12, color: 'rgba(241,240,255,0.4)', marginBottom: 4 }}>Tài khoản đang đăng nhập:</div>
+                <div style={{ fontWeight: 600 }}>{user?.email}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: 'rgba(241,240,255,0.4)', marginBottom: 4 }}>Đăng nhập lần cuối lúc:</div>
+                <div style={{ fontWeight: 600 }}>{user?.lastSignInTime ? new Date(user.lastSignInTime).toLocaleString('vi-VN') : 'Không rõ'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: 'rgba(241,240,255,0.4)', marginBottom: 4 }}>Ngày tạo tài khoản:</div>
+                <div style={{ fontWeight: 600 }}>{user?.createdAt ? new Date(user.createdAt).toLocaleString('vi-VN') : 'Không rõ'}</div>
+              </div>
+            </div>
+
+            <button onClick={() => setSessionModalOpen(false)} className="btn-primary" style={{ width: '100%', marginTop: 24, padding: '10px' }}>
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {isDeleteModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16
+        }}>
+          <div className="glass-card animate-fade-in-up" style={{
+            width: '100%', maxWidth: 400, padding: 32,
+            background: 'rgba(30,10,20,0.95)',
+            border: '1px solid rgba(244,114,182,0.3)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 60px rgba(225,29,72,0.3)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f87171' }}>Xóa tài khoản vĩnh viễn</h2>
+              <button onClick={() => setDeleteModalOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 14, color: 'rgba(241,240,255,0.7)', lineHeight: 1.5, marginBottom: 20 }}>
+              Hành động này <strong style={{ color: '#f87171' }}>KHÔNG THỂ HOÀN TÁC</strong>. Toàn bộ dữ liệu hồ sơ, ảnh đại diện, và tên đăng nhập của bạn sẽ bị xóa vĩnh viễn khỏi hệ thống Moji.
+            </p>
+
+            <form onSubmit={handleDeleteSubmit(onSubmitDelete)} style={{ display: 'flex', flexDirection: 'column' }}>
+              <InputField 
+                label="Nhập mật khẩu để xác nhận" 
+                type="password" 
+                placeholder="••••••••" 
+                error={deleteErrors.password?.message} 
+                {...registerDelete('password')} 
+              />
+              
+              <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+                <button type="button" onClick={() => setDeleteModalOpen(false)} className="btn-secondary" style={{ flex: 1, padding: '10px' }}>
+                  Hủy
+                </button>
+                <button type="submit" disabled={isDeleteSubmitting} style={{ 
+                  flex: 1, padding: '10px', borderRadius: 12,
+                  background: '#e11d48', color: '#fff', border: 'none',
+                  fontWeight: 600, cursor: 'pointer'
+                }}>
+                  {isDeleteSubmitting ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} /> : 'Xóa vĩnh viễn'}
                 </button>
               </div>
             </form>

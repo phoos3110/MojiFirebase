@@ -17,15 +17,17 @@ const deleteSchema = z.object({
   password: z.string().min(1, 'Vui lòng nhập mật khẩu để xác nhận'),
 })
 
-function InputField({ label, error, ...props }) {
+import { forwardRef } from 'react'
+
+const InputField = forwardRef(function InputField({ label, error, ...props }, ref) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
       <label style={{ fontSize: 13, fontWeight: 500, color: 'rgba(241,240,255,0.7)' }}>{label}</label>
-      <input className={`anime-input${error ? ' error' : ''}`} {...props} />
+      <input ref={ref} className={`anime-input${error ? ' error' : ''}`} {...props} />
       {error && <span className="error-msg"><AlertCircle size={12} /> {error}</span>}
     </div>
   )
-}
+})
 
 function SettingRow({ icon: Icon, label, desc, action, onClick, color = '#a78bfa', danger = false }) {
   return (

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, NavLink } from 'react-router'
 import {
   LayoutDashboard, User, Settings, LogOut, Menu, X, Bell, Sparkles, ChevronRight,
@@ -45,7 +45,19 @@ function Avatar({ user, size = 40 }) {
 export default function AppLayout({ children }) {
   const { user, signOut } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isNotifOpen, setNotifOpen] = useState(false)
+  const notifRef = useRef(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setNotifOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [])
 
   const handleSignOut = async () => {
     try {
@@ -217,20 +229,64 @@ export default function AppLayout({ children }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button style={{
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10, width: 38, height: 38,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'rgba(241,240,255,0.6)', transition: 'all 0.2s',
-              position: 'relative',
-            }}>
-              <Bell size={17} />
-              <div style={{
-                position: 'absolute', top: 8, right: 8, width: 8, height: 8,
-                background: '#db2777', borderRadius: '50%',
-                border: '1.5px solid #05010f',
-              }} />
-            </button>
+            
+            {/* Notification Dropdown */}
+            <div ref={notifRef} style={{ position: 'relative' }}>
+              <button 
+                onClick={() => setNotifOpen(!isNotifOpen)}
+                style={{
+                  background: isNotifOpen ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', 
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10, width: 38, height: 38,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'rgba(241,240,255,0.6)', transition: 'all 0.2s',
+                  position: 'relative',
+                }}>
+                <Bell size={17} />
+                <div style={{
+                  position: 'absolute', top: 8, right: 8, width: 8, height: 8,
+                  background: '#db2777', borderRadius: '50%',
+                  border: '1.5px solid #05010f',
+                }} />
+              </button>
+
+              {isNotifOpen && (
+                <div className="animate-fade-in-up" style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 12, width: 320,
+                  background: 'rgba(10,5,32,0.95)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(20px)', zIndex: 100,
+                  overflow: 'hidden',
+                }}>
+                  <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#f1f0ff' }}>Thông báo</h3>
+                    <span onClick={() => toast.success('Đã đánh dấu đọc tất cả')} style={{ fontSize: 12, color: '#a78bfa', cursor: 'pointer', fontWeight: 500 }}>Đánh dấu đã đọc</span>
+                  </div>
+                  <div style={{ maxHeight: 340, overflowY: 'auto', padding: '8px' }}>
+                    {[
+                      { id: 1, title: 'Tập mới ra lò! 🔥', desc: 'Jujutsu Kaisen Mùa 2 - Tập 13 đã có mặt. Xem ngay!', time: '10 phút trước', isNew: true },
+                      { id: 2, title: 'Khuyến mãi đặc quyền 💎', desc: 'Nâng cấp tài khoản Moji Premium giảm 50% chỉ hôm nay.', time: '1 giờ trước', isNew: true },
+                      { id: 3, title: 'Chào mừng bạn mới', desc: 'Cảm ơn bạn đã gia nhập cộng đồng Moji. Khám phá kho anime ngay nào!', time: '2 ngày trước', isNew: false },
+                    ].map(n => (
+                      <div key={n.id} style={{
+                        padding: '12px', borderRadius: 8, marginBottom: 4,
+                        background: n.isNew ? 'rgba(219,39,119,0.08)' : 'transparent',
+                        display: 'flex', gap: 12, cursor: 'pointer',
+                        transition: 'background 0.2s',
+                      }} className="glass-card-hover" onClick={() => setNotifOpen(false)}>
+                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.isNew ? '#db2777' : 'transparent', marginTop: 6, flexShrink: 0 }} />
+                         <div>
+                           <div style={{ fontSize: 13, fontWeight: 600, color: n.isNew ? '#f1f0ff' : 'rgba(241,240,255,0.7)' }}>{n.title}</div>
+                           <div style={{ fontSize: 12, color: 'rgba(241,240,255,0.5)', marginTop: 4, lineHeight: 1.4 }}>{n.desc}</div>
+                           <div style={{ fontSize: 11, color: 'rgba(241,240,255,0.3)', marginTop: 6 }}>{n.time}</div>
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Avatar user={user} size={34} />
           </div>
         </header>
